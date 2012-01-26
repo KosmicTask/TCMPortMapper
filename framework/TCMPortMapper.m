@@ -13,7 +13,7 @@
 #import <netinet/if_ether.h>
 #import <net/if_dl.h>
 #import <openssl/md5.h>
-
+#import <err.h>
 
 NSString * const TCMPortMapperExternalIPAddressDidChange             = @"TCMPortMapperExternalIPAddressDidChange";
 NSString * const TCMPortMapperWillStartSearchForRouterNotification   = @"TCMPortMapperWillStartSearchForRouterNotification";

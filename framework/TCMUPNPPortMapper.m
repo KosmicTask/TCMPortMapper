@@ -126,6 +126,7 @@ NSString * const TCMUPNPPortMapperDidEndWorkingNotification   =@"TCMUPNPPortMapp
             for(device = devlist; device && !foundIDGDevice; device = device->pNext) {
                 NSURL *descURL = [NSURL URLWithString:[NSString stringWithUTF8String:device->descURL]];
                 SCNetworkConnectionFlags status;
+                // TODO: SCNetworkCheckReachabilityByName is deprctaed in 10.6
                 Boolean success = SCNetworkCheckReachabilityByName([[descURL host] UTF8String], &status); 
 #ifndef NDEBUG
                 NSLog(@"UPnP: %@ %c%c%c%c%c%c%c host:%s st:%s",

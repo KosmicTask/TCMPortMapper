@@ -260,7 +260,7 @@
 		F2C660330D50C59B00820CAE /* DotGreen.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = DotGreen.png; path = general_artwork/DotGreen.png; sourceTree = "<group>"; };
 		F2C660340D50C59B00820CAE /* DotYellow.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = DotYellow.png; path = general_artwork/DotYellow.png; sourceTree = "<group>"; };
 		F2C6603C0D50C62F00820CAE /* English */ = {isa = PBXFileReference; lastKnownFileType = wrapper.nib; name = English; path = portmap/English.lproj/MainMenu.nib; sourceTree = "<group>"; };
-		F2C6603E0D50C62F00820CAE /* English */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = English; path = portmap/English.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		F2C6603E0D50C62F00820CAE /* English */ = {isa = PBXFileReference; fileEncoding = 10; lastKnownFileType = text.plist.strings; name = English; path = portmap/English.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		F2CDB8C50D65BF2200B6A4E7 /* NSAddTemplate.tiff */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; name = NSAddTemplate.tiff; path = portmap/artwork/NSAddTemplate.tiff; sourceTree = "<group>"; };
 		F2CDB8C60D65BF2200B6A4E7 /* NSRefreshTemplate.tiff */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; name = NSRefreshTemplate.tiff; path = portmap/artwork/NSRefreshTemplate.tiff; sourceTree = "<group>"; };
 		F2CDB8C70D65BF2200B6A4E7 /* NSRemoveTemplate.tiff */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; name = NSRemoveTemplate.tiff; path = portmap/artwork/NSRemoveTemplate.tiff; sourceTree = "<group>"; };
@@ -932,6 +932,7 @@
 				GCC_OPTIMIZATION_LEVEL = 0;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = framework/TCMPortMapper_Prefix.pch;
+				GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS = NO;
 				HEADER_SEARCH_PATHS = framework;
 				INFOPLIST_FILE = "framework/TCMPortMapper-Info.plist";
 				INSTALL_PATH = "@executable_path/../Frameworks";
@@ -963,6 +964,7 @@
 				GCC_MODEL_TUNING = G5;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = framework/TCMPortMapper_Prefix.pch;
+				GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS = NO;
 				HEADER_SEARCH_PATHS = framework;
 				INFOPLIST_FILE = "framework/TCMPortMapper-Info.plist";
 				INSTALL_PATH = "@executable_path/../Frameworks";
@@ -994,6 +996,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 10.6;
 				SDKROOT = "";
+				WARNING_CFLAGS = "-Wall";
 			};
 			name = Debug;
 		};
@@ -1010,6 +1013,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 10.6;
 				SDKROOT = "";
 				SEPARATE_STRIP = YES;
+				WARNING_CFLAGS = "-Wall";
 			};
 			name = Release;
 		};
