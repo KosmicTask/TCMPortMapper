@@ -113,13 +113,13 @@ static void readData (
             int result = setsockopt(CFSocketGetNative(listeningSocket), SOL_SOCKET, 
                                     SO_REUSEADDR, &yes, sizeof(int));
             if (result == -1) {
-                NSLog(@"Could not setsockopt to reuseaddr: %@ / %s", errno, strerror(errno));
+                NSLog(@"Could not setsockopt to reuseaddr: %d / %s", errno, strerror(errno));
             }
             
             result = setsockopt(CFSocketGetNative(listeningSocket), SOL_SOCKET, 
                                     SO_REUSEPORT, &yes, sizeof(int));
             if (result == -1) {
-                NSLog(@"Could not setsockopt to reuseport: %@ / %s", errno, strerror(errno));
+                NSLog(@"Could not setsockopt to reuseport: %d / %s", errno, strerror(errno));
             }
             
             CFDataRef addressData = NULL;
