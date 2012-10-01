@@ -1,6 +1,8 @@
 This is a clone of [TCMPortMapper](http://code.google.com/p/tcmportmapper/) from those lovable [Coding Monkeys](http://www.codingmonkeys.de/)
 
-TCMPortMapper is an Obj-C/Cocoa NAT-Traversal framework that maps ports via UPNP and NAT-PMP.
+This version no longer supports the ppc architecture. The 
+
+TCMPortMapper is an Obj-C/Cocoa NAT-Traversal framework that maps ports via UPNP and NAT-PMP. The TCMPortMapper framework is built with GC support enabled.
 
 #Introduction
 The two classes you are confronted with are TCMPortMapper and TCMPortMapping. TCMPortMapper is your primary source of information. If it is running, it you can get your external IP Address, the name of the router (in case it supports UPNP), and the status of the port mappings. Even when it is not running you can access your primary local IP Address, the IP Address of your Router, the HardwareAddress of your Router as well as the manufacturer corresponding to that hardware address. With this information you could e.g. do location based services.
