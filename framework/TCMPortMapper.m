@@ -13,7 +13,9 @@
 #import <netinet/if_ether.h>
 #import <net/if_dl.h>
 #import <openssl/md5.h>
-#import <err.h>
+
+// update port mappings all 30 minutes as a default
+#define UPNP_REFRESH_INTERVAL (30.*60.)
 
 NSString * const TCMPortMapperExternalIPAddressDidChange             = @"TCMPortMapperExternalIPAddressDidChange";
 NSString * const TCMPortMapperWillStartSearchForRouterNotification   = @"TCMPortMapperWillStartSearchForRouterNotification";
@@ -143,11 +145,12 @@ enum {
 @end
 
 @interface TCMPortMapper (Private) 
-
+- (void)cleanupUPNPPortMapperTimer;
 - (void)setExternalIPAddress:(NSString *)anAddress;
 - (void)setLocalIPAddress:(NSString *)anAddress;
 - (void)increaseWorkCount:(NSNotification *)aNotification;
 - (void)decreaseWorkCount:(NSNotification *)aNotification;
+- (void)scheduleRefresh;
 @end
 
 @implementation TCMPortMapper
@@ -167,7 +170,11 @@ enum {
     }
     if ((self=[super init])) {
         _systemConfigNotificationManager = [IXSCNotificationManager new];
+        // since we are only interested in this specific key, let us configure it so.
+        [_systemConfigNotificationManager setObservedKeys:[NSArray arrayWithObject:@"State:/Network/Global/IPv4"] regExes:nil];
         _isRunning = NO;
+        _ignoreNetworkChanges = NO;
+        _refreshIsScheduled = NO;
         _NATPMPPortMapper = [[TCMNATPMPPortMapper alloc] init];
         _UPNPPortMapper = [[TCMUPNPPortMapper alloc] init];
         _portMappings = [NSMutableSet new];
@@ -197,6 +204,7 @@ enum {
 }
 
 - (void)dealloc {
+	[self cleanupUPNPPortMapperTimer];
     [_systemConfigNotificationManager release];
     [_NATPMPPortMapper release];
     [_UPNPPortMapper release];
@@ -217,8 +225,12 @@ enum {
 }
 
 - (void)networkDidChange:(NSNotification *)aNotification {
+#ifndef NDEBUG
     NSLog(@"%s %@",__FUNCTION__,aNotification);
-    [self refresh];
+#endif
+    if (!_ignoreNetworkChanges) {
+    	[self scheduleRefresh];
+    }
 }
 
 - (NSString *)externalIPAddress {
@@ -294,17 +306,22 @@ enum {
     return [[_userID retain] autorelease];
 }
 
-- (void)hashUserID:(NSString *)aUserIDToHash {
-    // md5 has the username and take the first 8 bytes as hex
++ (NSString *)sizereducableHashOfString:(NSString *)inString {
     unsigned char digest[16];
-    char hashstring[32];
+    char hashstring[16*2+1];
     int i;
-    NSData *userNameData = [aUserIDToHash dataUsingEncoding:NSUTF8StringEncoding allowLossyConversion:NO];
-    MD5([userNameData bytes],[userNameData length],digest);
-    for(i=0;i<8;i++) sprintf(hashstring+i*2,"%02x",digest[i]);
+    NSData *dataToHash = [inString dataUsingEncoding:NSUTF8StringEncoding allowLossyConversion:NO];
+    MD5([dataToHash bytes],[dataToHash length],digest);
+    for(i=0;i<16;i++) sprintf(hashstring+i*2,"%02x",digest[i]);
     hashstring[i*2]=0;
     
-    [self setUserID:[NSString stringWithUTF8String:hashstring]];
+    return [NSString stringWithUTF8String:hashstring];
+}
+
+- (void)hashUserID:(NSString *)aUserIDToHash {
+	NSString *hashString = [TCMPortMapper sizereducableHashOfString:aUserIDToHash];
+	if ([hashString length] > 16) hashString = [hashString substringToIndex:16];
+    [self setUserID:hashString];
 }
 
 - (void)setUserID:(NSString *)aUserID {
@@ -356,6 +373,13 @@ enum {
         }
         if (_isRunning) [self updatePortMappings];
     }
+}
+
+// add some delay to the refresh caused by network changes so mDNSResponer has a little time to grab its port before us
+- (void)scheduleRefresh {
+	if (!_refreshIsScheduled) {
+		[self performSelector:@selector(refresh) withObject:nil afterDelay:0.5];
+	}
 }
 
 - (void)refresh {
@@ -413,12 +437,14 @@ enum {
             [[NSNotificationCenter defaultCenter] postNotificationName:TCMPortMapperDidFinishSearchForRouterNotification object:self];
         }
     } else {
+    	[_NATPMPPortMapper stopListeningToExternalIPAddressChanges];
         [[NSNotificationCenter defaultCenter] postNotificationName:TCMPortMapperDidFinishSearchForRouterNotification object:self];
     }
 
     // add the delay to bridge the gap between the thread starting and this method returning
     [self performSelector:@selector(decreaseWorkCount:) withObject:nil afterDelay:1.0];
-
+	// make way for further refresh schedulings
+	_refreshIsScheduled = NO;
 }
 
 - (void)setExternalIPAddress:(NSString *)anIPAddress {
@@ -591,6 +617,9 @@ enum {
     if (shouldNotify) {
         [[NSNotificationCenter defaultCenter] postNotificationName:TCMPortMapperDidFinishSearchForRouterNotification object:self];
     }
+    if (!_upnpPortMapperTimer) {
+    	_upnpPortMapperTimer = [[NSTimer scheduledTimerWithTimeInterval:UPNP_REFRESH_INTERVAL target:self selector:@selector(refresh) userInfo:nil repeats:YES] retain];
+    }
 }
 
 - (void)UPNPPortMapperDidFail:(NSNotification *)aNotification {
@@ -599,6 +628,7 @@ enum {
     } else if (_UPNPStatus==TCMPortMapProtocolWorks) {
         [self setExternalIPAddress:nil];
     }
+    [self cleanupUPNPPortMapperTimer];
     // also mark all port mappings as unmapped if NATPMP failed too
     if (_NATPMPStatus == TCMPortMapProtocolFailed) {
         [[NSNotificationCenter defaultCenter] postNotificationName:TCMPortMapperDidFinishSearchForRouterNotification object:self];
@@ -607,6 +637,14 @@ enum {
 
 - (void)printNotification:(NSNotification *)aNotification {
     NSLog(@"TCMPortMapper received notification: %@", aNotification);
+}
+
+- (void)cleanupUPNPPortMapperTimer {
+	if (_upnpPortMapperTimer) {
+		[_upnpPortMapperTimer invalidate];
+		[_upnpPortMapperTimer release];
+		_upnpPortMapperTimer = nil;
+	}
 }
 
 - (void)internalStop {
@@ -618,6 +656,9 @@ enum {
     
     [center removeObserver:self name:TCMUPNPPortMapperDidGetExternalIPAddressNotification object:_UPNPPortMapper];
     [center removeObserver:self name:TCMUPNPPortMapperDidFailNotification object:_UPNPPortMapper];
+    
+    [self cleanupUPNPPortMapperTimer];
+
 }
 
 - (void)stop {
@@ -737,14 +778,25 @@ enum {
     }
 }
 
-- (void)didWake:(NSNotification *)aNotification {
+- (void)postWakeAction {
+	_ignoreNetworkChanges = NO;
     if (_isRunning) {
         // take some time because on the moment of awakening e.g. airport isn't yet connected
-        [self performSelector:@selector(refresh) withObject:nil afterDelay:1.];
-    }
+        [self refresh];
+	}
 }
 
-- (void)willSleep:(NSNotification *)aNotificaiton {
+
+- (void)didWake:(NSNotification *)aNotification {
+	// postpone the action because we need to wait for some delay until stuff is up. moreover we need to give the buggy mdnsresponder a chance to grab his nat-pmp port so we can do so later
+	[self performSelector:@selector(postWakeAction) withObject:nil afterDelay:2.];
+}
+
+- (void)willSleep:(NSNotification *)aNotification {
+#ifdef DEBUG
+	NSLog(@"%s, pmp:%d, upnp:%d",__FUNCTION__,_NATPMPStatus,_UPNPStatus);
+#endif
+	_ignoreNetworkChanges = YES;
     if (_isRunning) {
         if (_NATPMPStatus == TCMPortMapProtocolWorks) {
             [_NATPMPPortMapper stopBlocking];
@@ -763,7 +815,7 @@ enum {
         // we have to check if the sender is actually our router - if not disregard
         if ([senderIPAddress isEqualToString:[self routerIPAddress]]) {
             if (![[self externalIPAddress] isEqualToString:[userInfo objectForKey:@"externalIPAddress"]]) {
-                NSLog(@"Refreshing because of  NAT-PMP-Device external IP broadcast:%@",userInfo);
+//                NSLog(@"Refreshing because of  NAT-PMP-Device external IP broadcast:%@",userInfo);
                 [self refresh];
             }
         } else {

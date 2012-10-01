@@ -1,6 +1,7 @@
 
 #import "TCMNATPMPPortMapper.h"
 #import "NSNotificationCenterThreadingAdditions.h"
+#import "natpmp.h"
 
 #import <netinet/in.h>
 #import <netinet6/in6.h>
@@ -92,6 +93,17 @@ static void readData (
         natPMPThreadIsRunningLock = [NSLock new];
         if ([natPMPThreadIsRunningLock respondsToSelector:@selector(setName:)]) 
             [(id)natPMPThreadIsRunningLock performSelector:@selector(setName:) withObject:@"NATPMPThreadRunningLock"];
+    }
+    return self;
+}
+
+- (void)dealloc {
+    [natPMPThreadIsRunningLock release];
+    [super dealloc];
+}
+
+- (void)ensureListeningToExternalIPAddressChanges {
+	if (!_externalAddressChangeListeningSocket) {
         // add UDP listener for public ip update packets
         //    0                   1                   2                   3
         //    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -105,21 +117,15 @@ static void readData (
         CFSocketContext socketContext;
         bzero(&socketContext, sizeof(CFSocketContext));
         socketContext.info = self;
-        CFSocketRef listeningSocket = NULL;
-        listeningSocket = CFSocketCreate(kCFAllocatorDefault, PF_INET, SOCK_DGRAM, IPPROTO_UDP, 
+        _externalAddressChangeListeningSocket = CFSocketCreate(kCFAllocatorDefault, PF_INET, SOCK_DGRAM, IPPROTO_UDP, 
                                            kCFSocketDataCallBack, readData, &socketContext);
-        if (listeningSocket) {
+        if (_externalAddressChangeListeningSocket) {
+        	// SO_REUSEPORT is enough for allowing multiple clients to listen to the same address/port combination
             int yes = 1;
-            int result = setsockopt(CFSocketGetNative(listeningSocket), SOL_SOCKET, 
-                                    SO_REUSEADDR, &yes, sizeof(int));
+            int result = setsockopt(CFSocketGetNative(_externalAddressChangeListeningSocket), SOL_SOCKET, 
+                                    SO_REUSEPORT, &yes, sizeof(yes));
             if (result == -1) {
-                NSLog(@"Could not setsockopt to reuseaddr: %d / %s", errno, strerror(errno));
-            }
-            
-            result = setsockopt(CFSocketGetNative(listeningSocket), SOL_SOCKET, 
-                                    SO_REUSEPORT, &yes, sizeof(int));
-            if (result == -1) {
-                NSLog(@"Could not setsockopt to reuseport: %d / %s", errno, strerror(errno));
+                NSLog(@"Could not setsockopt to SO_REUSEPORT: %d / %s", errno, strerror(errno));
             }
             
             CFDataRef addressData = NULL;
@@ -128,23 +134,25 @@ static void readData (
             bzero(&socketAddress, sizeof(struct sockaddr_in));
             socketAddress.sin_len = sizeof(struct sockaddr_in);
             socketAddress.sin_family = PF_INET;
-            socketAddress.sin_port = htons(5351);
+            socketAddress.sin_port = htons(5350);
             socketAddress.sin_addr.s_addr = inet_addr("224.0.0.1");
             
             addressData = CFDataCreate(kCFAllocatorDefault, (UInt8 *)&socketAddress, sizeof(struct sockaddr_in));
             if (addressData == NULL) {
-                NSLog(@"Could not create addressData");
+                NSLog(@"Could not create addressData for NAT-PMP external ip address change notification listening");
             } else {
                     
-                CFSocketError err = CFSocketSetAddress(listeningSocket, addressData);
+                CFSocketError err = CFSocketSetAddress(_externalAddressChangeListeningSocket, addressData);
                 if (err != kCFSocketSuccess) {
                     NSLog(@"%s could not set address on socket",__FUNCTION__);
                 } else {
                     CFRunLoopRef currentRunLoop = [[NSRunLoop currentRunLoop] getCFRunLoop];
     
-                    CFRunLoopSourceRef runLoopSource = CFSocketCreateRunLoopSource(kCFAllocatorDefault, listeningSocket, 0);
-                    CFRunLoopAddSource(currentRunLoop, runLoopSource, kCFRunLoopCommonModes);
-                    CFRelease(runLoopSource);
+                    CFRunLoopSourceRef runLoopSource = CFSocketCreateRunLoopSource(kCFAllocatorDefault, _externalAddressChangeListeningSocket, 0);
+                    if (runLoopSource) {
+	                    CFRunLoopAddSource(currentRunLoop, runLoopSource, kCFRunLoopCommonModes);
+                    	CFRelease(runLoopSource);
+                    }
                 }
                 
                 CFRelease(addressData);
@@ -152,16 +160,22 @@ static void readData (
             addressData = NULL;
 
         } else {
-            NSLog(@"Could not create listening socket for IPv4");
+            NSLog(@"Could not create listening socket for NAT-PMP external ip address change notifications (UDP 224.0.0.1:5350)");
         }
-    }
-    return self;
+	}
 }
 
-- (void)dealloc {
-    [natPMPThreadIsRunningLock release];
-    [super dealloc];
+- (void)stopListeningToExternalIPAddressChanges {
+#ifdef DEBUG
+	NSLog(@"%s, socket:%p",__FUNCTION__,_externalAddressChangeListeningSocket);
+#endif
+	if (_externalAddressChangeListeningSocket) {
+		CFSocketInvalidate(_externalAddressChangeListeningSocket);
+		CFRelease(_externalAddressChangeListeningSocket);
+		_externalAddressChangeListeningSocket = NULL;
+	}
 }
+
 
 - (void)stop {
     if ([_updateTimer isValid]) {
@@ -169,6 +183,9 @@ static void readData (
         [_updateTimer release];
         _updateTimer = nil;
     }
+
+	[self stopListeningToExternalIPAddressChanges];
+
     if (![natPMPThreadIsRunningLock tryLock] && (runningThreadID == TCMExternalIPThreadID)) {
         // stop that one
         IPAddressThreadShouldQuitAndRestart = PORTMAPREFRESHSHOULDNOTRESTART;
@@ -180,6 +197,9 @@ static void readData (
 }
 
 - (void)refresh {
+	// ensure running of external ip address change listener
+	[self ensureListeningToExternalIPAddressChanges];
+
     // Run externalipAddress in Thread
     if ([natPMPThreadIsRunningLock tryLock]) {
         _updateInterval = 3600 / 2.;
@@ -269,12 +289,12 @@ Standardablauf:
     if (shouldRemove) {
        [aPortMapping setMappingStatus:TCMPortMappingStatusUnmapped];
     } else {
-       _updateInterval = MIN(_updateInterval,response.newportmapping.lifetime/2.);
+       _updateInterval = MIN(_updateInterval,response.pnu.newportmapping.lifetime/2.);
        if (_updateInterval < 60.) {
-           NSLog(@"%s caution - new port mapping had a lifetime < 120. : %u - %@",__FUNCTION__,response.newportmapping.lifetime, aPortMapping);
+           NSLog(@"%s caution - new port mapping had a lifetime < 120. : %u - %@",__FUNCTION__,response.pnu.newportmapping.lifetime, aPortMapping);
            _updateInterval = 60.;
        }
-       [aPortMapping setExternalPort:response.newportmapping.mappedpublicport];
+       [aPortMapping setExternalPort:response.pnu.newportmapping.mappedpublicport];
        [aPortMapping setMappingStatus:TCMPortMappingStatusMapped];
     }
     
@@ -367,10 +387,9 @@ Standardablauf:
 
     [natPMPThreadIsRunningLock unlock];
     if (UpdatePortMappingsThreadShouldQuit) {
-        NSLog(@"%s scheduled refresh",__FUNCTION__);
         [self performSelectorOnMainThread:@selector(refresh) withObject:nil waitUntilDone:NO];
     } else if (UpdatePortMappingsThreadShouldRestart) {
-        [self performSelectorOnMainThread:@selector(updatePortMapping) withObject:nil waitUntilDone:NO];
+        [self performSelectorOnMainThread:@selector(updatePortMappings) withObject:nil waitUntilDone:NO];
     } else {
         if ([pm isRunning]) {
             [self performSelectorOnMainThread:@selector(adjustUpdateTimer) withObject:nil waitUntilDone:NO];
@@ -425,15 +444,23 @@ Standardablauf:
                 }
             } while(r==NATPMP_TRYAGAIN);
         
-            if(r<0) {
+            if(r<0 && r != NATPMP_ERR_NETWORKFAILURE) {
                didFail = YES;
 #ifndef NDEBUG
-               NSLog(@"NAT-PMP: IP refresh did time out");
+               NSLog(@"%s NAT-PMP: IP refresh did fail: %d",__FUNCTION__,r);
 #endif
             } else {
+                NSString *ipString = [NSString stringWithFormat:@"%s", inet_ntoa(response.pnu.publicaddress.addr)];
+            	if (r == NATPMP_ERR_NETWORKFAILURE) {
+            		ipString = @"0.0.0.0"; // citing the RFC:
+//   If the result code is non-zero, the value of External IP
+//   Address is undefined (MUST be set to zero on transmission, and MUST
+//   be ignored on reception).
+					// so we use 0.0.0.0 at this stage. also because that is what the airport is broadcasting.
+					// we externally can savely display 0.0.0.0 as not having an external ip
+            	}
                 /* TODO : check that response.type == 0 */
             
-                NSString *ipString = [NSString stringWithFormat:@"%s", inet_ntoa(response.publicaddress.addr)];
 #ifndef NDEBUG
                 NSLog(@"NAT-PMP:  found IP:%@",ipString);
 #endif
@@ -452,6 +479,7 @@ Standardablauf:
         }
     } else {
         if (didFail) {
+            [self performSelectorOnMainThread:@selector(stopListeningToExternalIPAddressChanges) withObject:nil waitUntilDone:NO];
             [[NSNotificationCenter defaultCenter] postNotificationOnMainThread:[NSNotification notificationWithName:TCMNATPMPPortMapperDidFailNotification object:self]];
         } else {
             [self performSelectorOnMainThread:@selector(updatePortMappings) withObject:nil waitUntilDone:0];
@@ -464,6 +492,7 @@ Standardablauf:
 - (void)stopBlocking {
     UpdatePortMappingsThreadShouldQuit = YES;
     IPAddressThreadShouldQuitAndRestart = YES;
+	[self stopListeningToExternalIPAddressChanges];
     [natPMPThreadIsRunningLock lock];
     NSSet *mappingsToStop = [[TCMPortMapper sharedInstance] portMappings];
     natpmp_t natpmp;

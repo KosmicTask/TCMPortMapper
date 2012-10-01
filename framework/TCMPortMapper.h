@@ -85,10 +85,14 @@ typedef enum {
     BOOL _sendUPNPMappingTableNotification;
     NSString *_userID;
     NSMutableSet *_upnpPortMappingsToRemove;
+    NSTimer *_upnpPortMapperTimer;
+    BOOL _ignoreNetworkChanges;
+    BOOL _refreshIsScheduled;
 }
 
 + (TCMPortMapper *)sharedInstance;
 + (NSString *)manufacturerForHardwareAddress:(NSString *)aMACAddress;
++ (NSString *)sizereducableHashOfString:(NSString *)inString;
 
 - (NSSet *)portMappings;
 - (NSMutableSet *)removeMappingQueue;

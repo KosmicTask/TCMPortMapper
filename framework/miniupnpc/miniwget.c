@@ -1,4 +1,4 @@
-/* $Id: miniwget.c,v 1.19 2007/11/02 14:16:19 nanard Exp $ */
+/* $Id: miniwget.c,v 1.22 2009/02/28 10:36:35 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005 Thomas Bernard
@@ -26,10 +26,11 @@
 #include <arpa/inet.h>
 #define closesocket close
 #endif
-/* for MIN() macro : */
 #if defined(__sun) || defined(sun)
-#include <utility.h>
+#define MIN(x,y) (((x)<(y))?(x):(y))
 #endif
+
+#include "miniupnpcstrings.h"
 
 /* miniwget2() :
  * */
@@ -96,6 +97,8 @@ miniwget2(const char * url, const char * host,
                  "GET %s HTTP/1.1\r\n"
 			     "Host: %s:%d\r\n"
 				 "Connection: Close\r\n"
+				 "User-Agent: " OS_STRING ", UPnP/1.0, MiniUPnPc/" MINIUPNPC_VERSION_STRING "\r\n"
+
 				 "\r\n",
 		    path, host, port);
 	/*write(s, buf, strlen(buf));*/
@@ -157,6 +160,10 @@ miniwget2(const char * url, const char * host,
  *    1 - Success         */
 int parseURL(const char * url, char * hostname, unsigned short * port, char * * path)
 {
+	if ( url==0 ) {
+		printf("%s: url was empty zero\n",__PRETTY_FUNCTION__);
+		return 0;
+	}
 	char * p1, *p2, *p3;
 	p1 = strstr(url, "://");
 	if(!p1)

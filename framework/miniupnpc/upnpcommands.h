@@ -1,7 +1,7 @@
-/* $Id: upnpcommands.h,v 1.12 2007/12/19 14:56:15 nanard Exp $ */
+/* $Id: upnpcommands.h,v 1.17 2009/04/17 21:21:19 nanard Exp $ */
 /* Miniupnp project : http://miniupnp.free.fr/
  * Author : Thomas Bernard
- * Copyright (c) 2005-2006 Thomas Bernard
+ * Copyright (c) 2005-2008 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided within this distribution */
 #ifndef __UPNPCOMMANDS_H__
@@ -19,29 +19,48 @@
 extern "C" {
 #endif
 
-LIBSPEC unsigned int
+#if (defined __STDC_VERSION__ && __STDC_VERSION__ >= 199901L)
+#define UNSIGNED_INTEGER unsigned long long
+#define STRTOUI	strtoull
+#else
+#define UNSIGNED_INTEGER unsigned int
+#define STRTOUI	strtoul
+#endif
+
+LIBSPEC UNSIGNED_INTEGER
 UPNP_GetTotalBytesSent(const char * controlURL,
 					const char * servicetype);
 
-LIBSPEC unsigned int
+LIBSPEC UNSIGNED_INTEGER
 UPNP_GetTotalBytesReceived(const char * controlURL,
 						const char * servicetype);
 
-LIBSPEC unsigned int
+LIBSPEC UNSIGNED_INTEGER
 UPNP_GetTotalPacketsSent(const char * controlURL,
 					const char * servicetype);
 
-LIBSPEC unsigned int
+LIBSPEC UNSIGNED_INTEGER
 UPNP_GetTotalPacketsReceived(const char * controlURL,
 					const char * servicetype);
 
-LIBSPEC void
+/* UPNP_GetStatusInfo()
+ * status and lastconnerror are 64 byte buffers
+ * Return values :
+ * UPNPCOMMAND_SUCCESS, UPNPCOMMAND_INVALID_ARGS, UPNPCOMMAND_UNKNOWN_ERROR
+ * or a UPnP Error code */
+LIBSPEC int
 UPNP_GetStatusInfo(const char * controlURL,
 			       const char * servicetype,
 				   char * status,
-				   unsigned int * uptime);
+				   unsigned int * uptime,
+                   char * lastconnerror);
 
-LIBSPEC void
+/* UPNP_GetConnectionTypeInfo()
+ * argument connectionType is a 64 character buffer
+ * Return Values :
+ * UPNPCOMMAND_SUCCESS, UPNPCOMMAND_INVALID_ARGS, UPNPCOMMAND_UNKNOWN_ERROR
+ * or a UPnP Error code */
+LIBSPEC int
 UPNP_GetConnectionTypeInfo(const char * controlURL,
                            const char * servicetype,
 						   char * connectionType);
@@ -62,13 +81,21 @@ UPNP_GetExternalIPAddress(const char * controlURL,
                           const char * servicetype,
                           char * extIpAdd);
 
-LIBSPEC void
+/* UPNP_GetLinkLayerMaxBitRates()
+ * call WANCommonInterfaceConfig:1#GetCommonLinkProperties
+ *
+ * return values :
+ * UPNPCOMMAND_SUCCESS, UPNPCOMMAND_INVALID_ARGS, UPNPCOMMAND_UNKNOWN_ERROR
+ * or a UPnP Error Code. */
+LIBSPEC int
 UPNP_GetLinkLayerMaxBitRates(const char* controlURL,
 							const char* servicetype,
 							unsigned int * bitrateDown,
 							unsigned int * bitrateUp);
 
 /* UPNP_AddPortMapping()
+ * if desc is NULL, it will be defaulted to "libminiupnpc"
+ * remoteHost is usually NULL because IGD don't support it.
  *
  * Return values :
  * 0 : SUCCESS
@@ -97,9 +124,12 @@ UPNP_AddPortMapping(const char * controlURL, const char * servicetype,
 				    const char * inPort,
 					const char * inClient,
 					const char * desc,
-                    const char * proto);
+                    const char * proto,
+                    const char * remoteHost);
 
 /* UPNP_DeletePortMapping()
+ * Use same argument values as what was used for AddPortMapping().
+ * remoteHost is usually NULL because IGD don't support it.
  * Return Values :
  * 0 : SUCCESS
  * NON ZERO : error. Either an UPnP error code or an undefined error.
@@ -109,14 +139,21 @@ UPNP_AddPortMapping(const char * controlURL, const char * servicetype,
  * 714 NoSuchEntryInArray - The specified value does not exist in the array */
 LIBSPEC int
 UPNP_DeletePortMapping(const char * controlURL, const char * servicetype,
-                       const char * extPort, const char * proto);
+                       const char * extPort, const char * proto,
+                       const char * remoteHost);
 
+/* UPNP_GetPortMappingNumberOfEntries()
+ * not supported by all routers */
 LIBSPEC int
 UPNP_GetPortMappingNumberOfEntries(const char* controlURL, const char* servicetype, unsigned int * num);
 
 /* UPNP_GetSpecificPortMappingEntry retrieves an existing port mapping
  * the result is returned in the intClient and intPort strings
- * please provide 16 and 6 bytes of data */
+ * please provide 16 and 6 bytes of data
+ *
+ * return value :
+ * UPNPCOMMAND_SUCCESS, UPNPCOMMAND_INVALID_ARGS, UPNPCOMMAND_UNKNOWN_ERROR
+ * or a UPnP Error Code. */
 LIBSPEC int
 UPNP_GetSpecificPortMappingEntry(const char * controlURL,
                                  const char * servicetype,
@@ -126,6 +163,10 @@ UPNP_GetSpecificPortMappingEntry(const char * controlURL,
                                  char * intPort);
 
 /* UPNP_GetGenericPortMappingEntry()
+ *
+ * return value :
+ * UPNPCOMMAND_SUCCESS, UPNPCOMMAND_INVALID_ARGS, UPNPCOMMAND_UNKNOWN_ERROR
+ * or a UPnP Error Code.
  *
  * Possible UPNP Error codes :
  * 402 Invalid Args - See UPnP Device Architecture section on Control.

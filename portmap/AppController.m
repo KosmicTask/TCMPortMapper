@@ -105,22 +105,30 @@
         if ([pm externalIPAddress]) {
             [O_taglineTextField setStringValue:[NSString stringWithFormat:@"%@ - %@ - %@",[pm mappingProtocol],[pm routerName],[pm routerIPAddress]]];
         } else {
-            [O_taglineTextField setStringValue:[NSString stringWithFormat:@"%@ - %@ - %@",[pm mappingProtocol],[pm routerName],[pm routerIPAddress]?[pm routerIPAddress]:@"No Router"]];
+            [O_taglineTextField setStringValue:[NSString stringWithFormat:@"%@ - %@ - %@",[pm mappingProtocol],[pm routerName],[pm routerIPAddress]?[pm routerIPAddress]:NSLocalizedString(@"No Router",@"")]];
         }
     } else {
-        [O_taglineTextField setStringValue:@"Stopped"];
+        [O_taglineTextField setStringValue:NSLocalizedString(@"Stopped",@"")];
     }
 
+}
+
+- (NSString *)externalIPAddressString {
+	NSString *externalIPAddress = [[TCMPortMapper sharedInstance] externalIPAddress];
+	if (!externalIPAddress || [externalIPAddress isEqualToString:@"0.0.0.0"]) {
+		externalIPAddress = NSLocalizedString(@"No external Address.",@"");
+	}
+	return externalIPAddress;
 }
 
 - (void)portMapperExternalIPAddressDidChange:(NSNotification *)aNotification {
     TCMPortMapper *pm=[TCMPortMapper sharedInstance];
     if ([pm isRunning]) {
-        if ([pm externalIPAddress]) {
-            [O_currentIPTextField setObjectValue:[pm externalIPAddress]];
-        }
+    	if ([pm externalIPAddress]) {
+			[O_currentIPTextField setObjectValue:[self externalIPAddressString]];
+		}
     } else {
-        [O_currentIPTextField setStringValue:@"Stopped"];
+        [O_currentIPTextField setStringValue:NSLocalizedString(@"Stopped",@"")];
     }
     [self updateTagLine];
 }
@@ -136,20 +144,20 @@
 
 - (void)portMapperWillSearchForRouter:(NSNotification *)aNotification {
     [O_refreshButton setEnabled:NO];
-    [O_currentIPTextField setStringValue:@"Searching..."];
+    [O_currentIPTextField setStringValue:NSLocalizedString(@"Searching...",@"")];
 }
 
 - (void)portMapperDidFindRouter:(NSNotification *)aNotification {
     [O_refreshButton setEnabled:YES];
     TCMPortMapper *pm=[TCMPortMapper sharedInstance];
     if ([pm externalIPAddress]) {
-        [O_currentIPTextField setObjectValue:[pm externalIPAddress]];
+		[O_currentIPTextField setObjectValue:[self externalIPAddressString]];
     } else {
 		if ([pm routerIPAddress]) {
-			[O_currentIPTextField setStringValue:@"Router incompatible."];
+			[O_currentIPTextField setStringValue:NSLocalizedString(@"Router incompatible.",@"")];
 			[self showInstructionalPanel:self];
 		} else {
-			[O_currentIPTextField setStringValue:@"Can't find router."];
+			[O_currentIPTextField setStringValue:NSLocalizedString(@"Can't find router.",@"")];
 		}
     }
     [self updateTagLine];
@@ -183,7 +191,14 @@
     [O_globalProgressIndicator stopAnimation:self];
     [O_UPNPTabItemProgressIndicator stopAnimation:self];
     [O_showUPNPMappingTableButton setEnabled:[[TCMPortMapper sharedInstance] mappingProtocol] == TCMUPNPPortMapProtocol];
-    [O_localIPAddressTextField setStringValue:[[TCMPortMapper sharedInstance] localIPAddress]];
+    NSString *localIPAddress = [[TCMPortMapper sharedInstance] localIPAddress];
+ 	if (!localIPAddress) {
+		[[O_currentIPTextField window] setTitle:@"Port Map"];
+	    [O_localIPAddressTextField setStringValue:@""];
+ 	} else {
+	    [O_localIPAddressTextField setStringValue:localIPAddress];
+	    [[O_currentIPTextField window] setTitle:[NSString stringWithFormat:NSLocalizedString(@"Port Map on %@",@""), localIPAddress]];
+ 	}
 }
 
 #pragma mark -
@@ -216,7 +231,7 @@
 
 - (IBAction)endInstructionalSheet:(id)aSender {
 	if ([aSender tag] == 42) {
-		[[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:@"http://docs.info.apple.com/article.html?artnum=302510"]];
+		[[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:NSLocalizedString(@"NAT-PMP Howto URL",@"")]];
 	}
 	
 	if ([O_dontShowInstructionsAgainButton state] == NSOnState) {
@@ -255,15 +270,22 @@
 }
 
 - (IBAction)gotoPortMapHomepage:(id)aSender {
-    [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:@"http://www.codingmonkeys.de/portmap/"]];
+    [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:NSLocalizedString(@"Port Map URL",@"")]];
 }
+
 - (IBAction)gotoTCMPortMapperSources:(id)aSender {
-    [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:@"http://code.google.com/p/tcmportmapper/"]];
+    [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:NSLocalizedString(@"TCMPortMapper URL",@"")]];
 }
 
 - (IBAction)reportABug:(id)aSender {
-    [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:@"http://code.google.com/p/tcmportmapper/issues/entry"]];
+    [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:NSLocalizedString(@"Bugtracker URL",@"")]];
 }
+
+- (IBAction)showReleaseNotes:(id)aSender {
+	NSURL *releaseNotesURL = [NSURL fileURLWithPath:[[NSBundle mainBundle] pathForResource:@"portmap_releasenotes" ofType:@"html"]];
+    [[NSWorkspace sharedWorkspace] openURL:releaseNotesURL];
+}
+
 
 - (IBAction)showAbout:(id)aSender {
     [O_aboutWindow center];

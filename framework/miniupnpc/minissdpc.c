@@ -1,7 +1,7 @@
-/* $Id: minissdpc.c,v 1.4 2007/12/19 14:56:58 nanard Exp $ */
+/* $Id: minissdpc.c,v 1.7 2008/12/18 17:45:48 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas BERNARD
- * copyright (c) 2005-2007 Thomas Bernard
+ * copyright (c) 2005-2008 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
 /*#include <syslog.h>*/
@@ -10,17 +10,19 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
+#ifdef WIN32
+#include <winsock2.h>
+#include <Ws2tcpip.h>
+#include <io.h>
+#else
 #include <sys/socket.h>
 #include <sys/un.h>
+#endif
 
 #include "minissdpc.h"
 #include "miniupnpc.h"
 
-#define DECODELENGTH(n, p) n = 0; \
-                           do { n = (n << 7) | (*p & 0x7f); } \
-                           while(*(p++)&0x80);
-#define CODELENGTH(n, p) do { *p = (n & 0x7f) | ((n > 0x7f) ? 0x80 : 0); \
-                              p++; n >>= 7; } while(n);
+#include "codelength.h"
 
 struct UPNPDev *
 getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath)
@@ -52,7 +54,7 @@ getDevicesFromMiniSSDPD(const char * devtype, const char * socketpath)
 		return NULL;
 	}
 	stsize = strlen(devtype);
-	buffer[0] = 1;
+	buffer[0] = 1; /* request type 1 : request devices/services by type */
 	p = buffer + 1;
 	l = stsize;	CODELENGTH(l, p);
 	memcpy(p, devtype, stsize);
