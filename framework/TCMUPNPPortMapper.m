@@ -171,8 +171,18 @@ NSString * const TCMUPNPPortMapperDidEndWorkingNotification   =@"TCMUPNPPortMapp
             NSMutableSet *triedURLSet = [NSMutableSet set];
             for(device = devlist; device && !foundIDGDevice; device = device->pNext) {
                 NSURL *descURL = [NSURL URLWithString:[NSString stringWithUTF8String:device->descURL]];
-                SCNetworkConnectionFlags status;
-                Boolean success = SCNetworkCheckReachabilityByName([[descURL host] UTF8String], &status); 
+                SCNetworkConnectionFlags status = 0;
+                Boolean success = 0;
+                const char *name = [[descURL host] UTF8String];
+                
+#if MAC_OS_X_VERSION_MIN_REQUIRED == MAC_OS_X_VERSION_10_2
+                success = SCNetworkCheckReachabilityByName(name, &status);
+#else
+                SCNetworkReachabilityRef target = SCNetworkReachabilityCreateWithName(NULL, name);
+                success = SCNetworkReachabilityGetFlags(target, &status);
+                CFRelease(target);
+#endif
+                
 #ifndef NDEBUG
                 NSLog(@"UPnP: %@ %c%c%c%c%c%c%c host:%s st:%s",
                     success ? @"YES" : @" NO",

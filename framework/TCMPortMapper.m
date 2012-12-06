@@ -216,10 +216,19 @@ enum {
 }
 
 - (BOOL)networkReachable {
-    Boolean success; 
-    BOOL okay; 
-    SCNetworkConnectionFlags status;
-    success = SCNetworkCheckReachabilityByName("www.apple.com", &status); 
+    Boolean success = 0;
+    BOOL okay = NO;
+    SCNetworkConnectionFlags status = 0;
+    char *name = "www.apple.com";
+    
+#if MAC_OS_X_VERSION_MIN_REQUIRED == MAC_OS_X_VERSION_10_2
+    success = SCNetworkCheckReachabilityByName(name, &status);
+#else
+    SCNetworkReachabilityRef target = SCNetworkReachabilityCreateWithName(NULL, name);
+    success = SCNetworkReachabilityGetFlags(target, &status);
+    CFRelease(target);
+#endif
+    
     okay = success && (status & kSCNetworkFlagsReachable) && !(status & kSCNetworkFlagsConnectionRequired); 
     
     return okay;

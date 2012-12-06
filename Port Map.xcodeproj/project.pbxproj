@@ -1028,6 +1028,7 @@
 				SDKROOT = macosx;
 				"SDKROOT[arch=i386]" = macosx;
 				"SDKROOT[arch=x86_64]" = macosx;
+				WARNING_CFLAGS = "-Wall";
 			};
 			name = Debug;
 		};
@@ -1045,6 +1046,7 @@
 				SDKROOT = macosx;
 				"SDKROOT[arch=i386]" = macosx;
 				"SDKROOT[arch=x86_64]" = macosx;
+				WARNING_CFLAGS = "-Wall";
 			};
 			name = Release;
 		};
