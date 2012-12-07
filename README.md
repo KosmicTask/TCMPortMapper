@@ -65,13 +65,16 @@ In addition to that - to be a good citizen and remove the port mappings on termi
 
 If you want to provide your users with an option wether to automatically forward your ports, you simply wire it up with the start / stop methods of the port mapper and add a check for the default around the start message you send when your service is setup.
 
-Changing Port Numbers of Mappings
+#Changing Port Numbers of Mappings
+
 Currently the TCMPortMapping objects are immutable objects. If you want to change a port number for an existing mapping then you have to remove it first and readd a different one like this:
 
 	TCMPortMapper *pm = [TCMPortMapper sharedInstance];
 	[[TCMPortMapper sharedInstance] removePortMapping:oldMapping];
 	TCMPortMapping *newMapping = [TCMPortMapping portMappingWithLocalPort:port desiredExternalPort:port transportProtocol:TCMPortMappingTransportProtocolTCP userInfo:nil];
 	[pm addPortMapping:newMapping];
+
+Note that the above code will not reliably change just the public port for an existing mapping. When the mapping is removed a thread updates the port mapper. When the new mapping is added the previous update thread is cancelled and a new update thread is started. This thread sees that a private port matching the new mapping already exists and updates the desired external port to match the existing value. So the effect is zero change. To successfully change just the public port value call `- removePortMapping`, allow the mapper to finish working and then call `- addPortMapping`
 
 If you manage more than one mapping and want to remove/change them individually then you have to either hold on to them in your code, mark them with a corresponding userInfo or be able to identify them using the port numbers alone.
 
