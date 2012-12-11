@@ -83,7 +83,7 @@ NSString * const TCMUPNPPortMapperDidEndWorkingNotification   =@"TCMUPNPPortMapp
     if (!description) {
     	NSString *prefix = @"cPM";
         NSMutableArray *descriptionComponents=[NSMutableArray array];
-        NSString *component = [[[[NSBundle mainBundle] bundlePath] lastPathComponent] stringByDeletingPathExtension];
+        NSString *component = [[TCMPortMapper sharedInstance] appIdentifier];
         NSString *userID = [[TCMPortMapper sharedInstance] userID];
         if (component) {
         	// make sure _ and . are the only non alphanumeric characters in the name so we don't run into problems with routers which change the description (eg. avm routers)

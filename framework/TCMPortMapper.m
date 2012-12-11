@@ -15,6 +15,8 @@
 #import <openssl/md5.h>
 #import <err.h> 
 
+void CopySerialNumber(CFStringRef *serialNumber);
+
 // update port mappings all 30 minutes as a default
 #define UPNP_REFRESH_INTERVAL (30.*60.)
 
@@ -156,6 +158,8 @@ enum {
 
 @implementation TCMPortMapper
 
+@synthesize appIdentifier = _appIdentifier;
+
 + (TCMPortMapper *)sharedInstance
 {
     if (!S_sharedInstance) {
@@ -182,7 +186,16 @@ enum {
         _removeMappingQueue = [NSMutableSet new];
         _upnpPortMappingsToRemove = [NSMutableSet new];
         
-        [self hashUserID:NSUserName()];
+        // use the machine serial number to increase uniqueness in situations where usernames may be reused,
+        // such as in labs, educational and development environments
+        NSString *userName = NSUserName();
+        CFStringRef serialNumber;
+        CopySerialNumber(&serialNumber);
+        if (serialNumber) {
+            userName = [NSString stringWithFormat:@"%@@%@", userName, serialNumber];
+            CFRelease(serialNumber);
+        }
+        [self hashUserID:userName];
         
         S_sharedInstance = self;
 
@@ -215,6 +228,14 @@ enum {
     [super dealloc];
 }
 
+- (NSString *)appIdentifier
+{
+    if (_appIdentifier) {
+        return _appIdentifier;
+    } else {
+        return [[[[NSBundle mainBundle] bundlePath] lastPathComponent] stringByDeletingPathExtension];
+    }
+}
 - (BOOL)networkReachable {
     Boolean success = 0;
     BOOL okay = NO;
@@ -836,3 +857,27 @@ enum {
 
 @end
 
+// Returns the serial number as a CFString.
+// It is the caller's responsibility to release the returned CFString when done with it.
+void CopySerialNumber(CFStringRef *serialNumber)
+{
+    
+	if (serialNumber != NULL) {
+		*serialNumber = NULL;
+		
+		io_service_t    platformExpert = IOServiceGetMatchingService(kIOMasterPortDefault,
+																	 IOServiceMatching("IOPlatformExpertDevice"));
+		
+		if (platformExpert) {
+			CFTypeRef serialNumberAsCFString =
+			IORegistryEntryCreateCFProperty(platformExpert,
+											CFSTR(kIOPlatformSerialNumberKey),
+											kCFAllocatorDefault, 0);
+			if (serialNumberAsCFString) {
+				*serialNumber = serialNumberAsCFString;
+			}
+			
+			IOObjectRelease(platformExpert);
+		}
+	}
+}
