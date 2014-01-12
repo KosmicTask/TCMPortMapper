@@ -12,8 +12,15 @@
 #import <net/route.h>
 #import <netinet/if_ether.h>
 #import <net/if_dl.h>
+
+// openssl is deprectaed on OS X 10.7+
+#ifdef USE_OPENSSL
 #import <openssl/md5.h>
-#import <err.h> 
+#else
+#import <CommonCrypto/CommonDigest.h>
+#endif
+
+#import <err.h>
 
 void CopySerialNumber(CFStringRef *serialNumber);
 
@@ -342,7 +349,13 @@ enum {
     char hashstring[16*2+1];
     int i;
     NSData *dataToHash = [inString dataUsingEncoding:NSUTF8StringEncoding allowLossyConversion:NO];
+
+#ifdef USE_OPENSSL
     MD5([dataToHash bytes],[dataToHash length],digest);
+#else
+    CC_MD5([dataToHash bytes], [dataToHash length], digest);
+#endif
+    
     for(i=0;i<16;i++) sprintf(hashstring+i*2,"%02x",digest[i]);
     hashstring[i*2]=0;
     
