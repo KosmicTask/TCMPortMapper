@@ -978,8 +978,6 @@
 					Foundation,
 					"-framework",
 					AppKit,
-					"-lssl",
-					"-lcrypto",
 				);
 				PRODUCT_NAME = TCMPortMapper;
 				USER_HEADER_SEARCH_PATHS = framework;
@@ -1010,8 +1008,6 @@
 					Foundation,
 					"-framework",
 					AppKit,
-					"-lssl",
-					"-lcrypto",
 				);
 				PRODUCT_NAME = TCMPortMapper;
 				USER_HEADER_SEARCH_PATHS = framework;

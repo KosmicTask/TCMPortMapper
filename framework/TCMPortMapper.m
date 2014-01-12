@@ -13,7 +13,7 @@
 #import <netinet/if_ether.h>
 #import <net/if_dl.h>
 
-// openssl is deprectaed on OS X 10.7+
+// openssl is deprecated on OS X 10.7+
 #ifdef USE_OPENSSL
 #import <openssl/md5.h>
 #else
