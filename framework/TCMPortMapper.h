@@ -107,7 +107,7 @@ typedef enum {
 - (void)stop;
 - (void)stopBlocking;
 
-@property (retain) NSString *appIdentifier;
+@property (retain, nonatomic) NSString *appIdentifier;
 
 // will request the complete UPNPMappingTable and deliver it using a TCMPortMapperDidReceiveUPNPMappingTableNotification with "mappingTable" in the userInfo Dictionary (if current router is a UPNP router)
 - (void)requestUPNPMappingTable;
